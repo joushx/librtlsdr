@@ -1441,9 +1441,7 @@ int rtlsdr_check_dongle_model(void *dev, char *manufact_check, char *product_che
 	return 0;
 }
 
-
-int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
-{
+int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index) {
 	int r;
 	int i;
 	libusb_device **list;
@@ -1454,22 +1452,13 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 	uint8_t reg;
 	ssize_t cnt;
 
-	dev = malloc(sizeof(rtlsdr_dev_t));
-	if (NULL == dev)
-		return -ENOMEM;
-
-	memset(dev, 0, sizeof(rtlsdr_dev_t));
-	memcpy(dev->fir, fir_default, sizeof(fir_default));
-
-	r = libusb_init(&dev->ctx);
+	r = libusb_init(NULL);
 	if(r < 0){
 		free(dev);
 		return -1;
 	}
 
-	dev->dev_lost = 1;
-
-	cnt = libusb_get_device_list(dev->ctx, &list);
+	cnt = libusb_get_device_list(NULL, &list);
 
 	for (i = 0; i < cnt; i++) {
 		device = list[i];
@@ -1491,7 +1480,8 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 		goto err;
 	}
 
-	r = libusb_open(device, &dev->devh);
+	libusb_device_handle *devh;
+	r = libusb_open(device, &devh);
 	if (r < 0) {
 		libusb_free_device_list(list, 1);
 		fprintf(stderr, "usb_open error %d\n", r);
@@ -1522,6 +1512,62 @@ int rtlsdr_open(rtlsdr_dev_t **out_dev, uint32_t index)
 				" detaching at compile time.\n\n");
 #endif
 	}
+
+err:
+	if (dev) {
+		if (devh)
+			libusb_close(devh);
+
+		libusb_exit(NULL);
+
+		free(dev);
+	}
+
+	return rtlsdr_open_common(&dev, devh);
+}
+
+int rtlsdr_open_fd(rtlsdr_dev_t **dev, int fd) {
+	int ret;
+	libusb_device_handle *devh;
+
+	ret = libusb_set_option(NULL, LIBUSB_OPTION_NO_DEVICE_DISCOVERY, NULL);
+	if (ret < 0) {
+		return -1;
+	}
+
+	ret = libusb_init(NULL);
+	if (ret < 0) {
+		return -1;
+	}
+
+	ret = libusb_wrap_sys_device(NULL, (intptr_t)fd, &devh);
+	if (ret < 0) {
+		return -1;
+	}
+
+	return rtlsdr_open_common(dev, devh);
+}
+
+int rtlsdr_open_common(rtlsdr_dev_t **out_dev, libusb_device_handle *devh)
+{
+	int r;
+	int i;
+	libusb_device **list;
+	rtlsdr_dev_t *dev = NULL;
+	libusb_device *device = NULL;
+	uint32_t device_count = 0;
+	struct libusb_device_descriptor dd;
+	uint8_t reg;
+	ssize_t cnt;
+
+	dev = malloc(sizeof(rtlsdr_dev_t));
+	if (NULL == dev)
+		return -ENOMEM;
+
+	memset(dev, 0, sizeof(rtlsdr_dev_t));
+	memcpy(dev->fir, fir_default, sizeof(fir_default));
+
+	dev->devh = devh;
 
 	r = libusb_claim_interface(dev->devh, 0);
 	if (r < 0) {

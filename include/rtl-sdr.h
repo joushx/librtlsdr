@@ -62,6 +62,10 @@ RTLSDR_API int rtlsdr_get_index_by_serial(const char *serial);
 
 RTLSDR_API int rtlsdr_open(rtlsdr_dev_t **dev, uint32_t index);
 
+RTLSDR_API int rtlsdr_open_fd(rtlsdr_dev_t **dev, int fd);
+
+RTLSDR_API int rtlsdr_open_common(rtlsdr_dev_t **dev, libusb_device_handle *devh);
+
 RTLSDR_API int rtlsdr_close(rtlsdr_dev_t *dev);
 
 /* configuration functions */
